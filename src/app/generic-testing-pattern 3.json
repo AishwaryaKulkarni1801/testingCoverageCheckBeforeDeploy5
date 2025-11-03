@@ -1,0 +1,686 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "created": "2025-10-08",
+    "purpose": "Generic testing pattern for frontend projects (Angular / React / Node front-end code). Designed to be used as input for automated test generators or Copilot-style prompts.",
+    "scope": ["angular", "react", "node"],
+    "defaultCoverageTargetPct": 90,
+    "notes": "This pattern is framework-agnostic; use framework adapters section to map to specific test runners/libraries."
+  },
+
+  "frameworkGuidelines": {
+    "preferredUnitRunners": ["jest", "mocha"],
+    "preferredE2ERunners": ["cypress", "playwright"],
+    "uiTestingLibraries": {
+      "angular": ["@angular/core/testing (TestBed)", "jest (Direct Instantiation)"],
+      "react": ["@testing-library/react", "enzyme (legacy)"],
+      "node": ["supertest (for express endpoints)", "jest"]
+    },
+    "mockingLibraries": ["jest.fn / jest.mock", "sinon (optional)", "msw (network mocking)", "nock (node http)"]
+  },
+
+  "patterns": [
+    {
+      "id": "API_COMM",
+      "name": "API Communication Layer",
+      "triggerIndicators": ["fetch(", "axios", "HttpClient", "ApiService", "/api/"],
+      "priority": 1,
+      "whatToCover": [
+        "API call success (200) — correct data mapping to models",
+        "Client error (4xx) — error handling & user-visible message",
+        "Server error (5xx) — fallback and retry logic",
+        "Network error / timeout — retries & graceful degradation",
+        "Interceptor/middleware behavior (auth injection, logging)",
+        "Response schema validation / mapping to typed models"
+      ],
+      "mocking": [
+        "mockHttpClient (Angular HttpClient or axios stub)",
+        "mockFetch (global fetch stub)",
+        "msw or nock for integration-style tests",
+        "spy/stub on API methods"
+      ],
+      "testTemplates": {
+        "success": "mockApi.method.mockResolvedValue(mockSuccessResponse);\nawait unitUnderTest();\nexpect(mappedResult).toEqual(expectedModel);",
+        "error": "mockApi.method.mockRejectedValue({status:500, message:'Server error'});\nawait unitUnderTest();\nexpect(handleError).toHaveBeenCalled();",
+        "authHeader": "mockHttp.intercept.mockImplementation((req) => {\n  expect(req.headers['Authorization']).toBe('Bearer <token>');\n});"
+      },
+      "automationHints": {
+        "detect": ["files with 'Service' suffix", "calls to axios/fetch/HttpClient", "import of '/api/' endpoints"],
+        "applyPattern": "apiResponseTesting"
+      },
+      "recommendedCoveragePct": 90
+    },
+    {
+      "id": "COMPONENT_UI",
+      "name": "Component / UI Logic",
+      "triggerIndicators": ["render(", "component", "useState", "FormGroup", "props", "template", "tsx", ".jsx"],
+      "priority": 1,
+      "whatToCover": [
+        "Component renders without error",
+        "Input/props binding and output/events",
+        "Event handling (clicks, submits, keyboard)",
+        "Conditional rendering variants (data present, empty, error)",
+        "Loading state and spinner behavior",
+        "Re-render/change detection correctness",
+        "Accessibility basics (aria attributes, labels)"
+      ],
+      "mocking": ["mock services/hooks", "mock child components", "mock DOM APIs (ElementRef)"],
+      "testTemplates": {
+        "render": "render(<Component {...defaultProps} />);\nexpect(screen.getByText('Expected text')).toBeInTheDocument();",
+        "event": "fireEvent.click(screen.getByRole('button', {name:'Save'}));\nexpect(mockedHandler).toHaveBeenCalled();",
+        "states": "/* test loading, success, empty, error */"
+      },
+      "automationHints": {
+        "detect": ["JSX/TSX files", "Angular templates", "usage of form controls", "onClick/onSubmit handlers"],
+        "applyPattern": "componentInstantiation"
+      },
+      "recommendedCoveragePct": 90
+    },
+    {
+      "id": "BUSINESS_LOGIC",
+      "name": "Business Logic / Utilities / Helpers",
+      "triggerIndicators": ["utils/", "helpers/", "formatDate", "validate", "encrypt", "decrypt"],
+      "priority": 2,
+      "whatToCover": [
+        "Pure functions—deterministic input => expected output",
+        "Edge cases: null, undefined, empty, malformed inputs",
+        "Validation, parsing, formatting functions",
+        "Encryption/decryption flows (mock keys)",
+        "Date/time functions (use mocked Date or time lib)"
+      ],
+      "mocking": ["none or light mocking of dependencies", "mock Date.now() or timezone"],
+      "testTemplates": {
+        "pureFn": "expect(formatter('2025-10-08')).toBe('08 Oct 2025');",
+        "edgeCase": "expect(validator(null)).toBe(false);"
+      },
+      "recommendedCoveragePct": 100
+    },
+    {
+      "id": "AUTH",
+      "name": "Authentication & Authorization",
+      "triggerIndicators": ["localStorage.getItem('token')", "AuthService", "jwt", "isAuthenticated", "route guard"],
+      "priority": 2,
+      "whatToCover": [
+        "Token read/write from storage (localStorage/sessionStorage/IndexedDB)",
+        "Auth guard / protected route logic",
+        "Expired token handling and refresh flows",
+        "Role-based UI rendering and API access",
+        "Logout clears sensitive data"
+      ],
+      "mocking": ["mock storage APIs", "mock valid/invalid/expired tokens", "mock refresh token endpoint"],
+      "testTemplates": {
+        "tokenFlow": "localStorage.setItem('token', validToken);\nexpect(authService.isAuthenticated()).toBe(true);",
+        "expiredToken": "localStorage.setItem('token', expiredToken);\nawait unitUnderTest();\nexpect(redirectToLogin).toHaveBeenCalled();"
+      },
+      "recommendedCoveragePct": 90
+    },
+    {
+      "id": "STATE_MANAGEMENT",
+      "name": "State Management (NgRx / Redux / Context)",
+      "triggerIndicators": ["store.dispatch(", "createReducer", "useReducer", "ngrx", "redux", "selector"],
+      "priority": 3,
+      "whatToCover": [
+        "Initial state correctness",
+        "Actions cause expected reducer state changes",
+        "Selectors return the right slice",
+        "No accidental mutation (immutability)",
+        "Middleware / effects side-effects (api triggers)"
+      ],
+      "mocking": ["mock store / test store", "mock effects or sagas"],
+      "testTemplates": {
+        "reducer": "expect(reducer(initialState, someAction)).toEqual(expectedState);",
+        "selector": "expect(selectSomeValue(state)).toBe(expected);"
+      },
+      "recommendedCoveragePct": 90
+    },
+    {
+      "id": "LOCAL_STORAGE_CACHE",
+      "name": "Local Storage / IndexedDB / Caching",
+      "triggerIndicators": ["localStorage", "indexedDB", "Cache", "serviceWorker", "caching"],
+      "priority": 3,
+      "whatToCover": [
+        "Write/read correctness",
+        "Cache expiry / TTL behavior",
+        "Fallback to network when cache empty",
+        "Clear / reset functions"
+      ],
+      "mocking": ["mock localStorage", "mock indexedDB adapters"],
+      "testTemplates": {
+        "writeRead": "cache.set('key', 'value');\nexpect(cache.get('key')).toBe('value');",
+        "expiry": "advanceTimeBy(ttl + 1);\nexpect(cache.get('key')).toBeNull();"
+      },
+      "recommendedCoveragePct": 80
+    },
+    {
+      "id": "ROUTING_NAV",
+      "name": "Routing & Navigation",
+      "triggerIndicators": ["Router", "useHistory", "navigate", "route params", "ActivatedRoute", "useRouter"],
+      "priority": 3,
+      "whatToCover": [
+        "Correct component loaded for a route",
+        "Guards/redirects behavior",
+        "Param and query string extraction",
+        "404 / fallback redirects"
+      ],
+      "mocking": ["mock router implementation", "spy on navigation functions"],
+      "testTemplates": {
+        "guardPass": "mockAuth(true);\nexpect(navigateTo).not.toHaveBeenCalledWith('/login');",
+        "params": "mockRouteParams({id: '123'});\nexpect(component.id).toBe('123');"
+      },
+      "recommendedCoveragePct": 80
+    },
+    {
+      "id": "ERROR_LOGGING",
+      "name": "Error Handling & Logging",
+      "triggerIndicators": ["try", "catch", "globalErrorHandler", "console.error", "Sentry", "logError"],
+      "priority": 4,
+      "whatToCover": [
+        "Global error handler captures uncaught errors",
+        "API/UI errors are shown to users correctly",
+        "No sensitive/Pii data in logs",
+        "Logging integration calls (Sentry, custom logger)"
+      ],
+      "mocking": ["spy on console methods", "mock logger service"],
+      "testTemplates": {
+        "globalError": "throw new Error('boom');\nexpect(logger.capture).toHaveBeenCalledWith(expect.objectContaining({message:'boom'}));"
+      },
+      "recommendedCoveragePct": 80
+    },
+    {
+      "id": "PERFORMANCE_EDGE",
+      "name": "Performance & Edge Conditions",
+      "triggerIndicators": ["debounce", "throttle", "setTimeout", "setInterval", "largeList", "virtualize"],
+      "priority": 5,
+      "whatToCover": [
+        "Debounce / throttle correctness",
+        "Timers cleared on destroy/unmount",
+        "Large input / payload handling",
+        "Memory leaks (subscription cleanup)"
+      ],
+      "mocking": ["use fake timers (jest.useFakeTimers)"],
+      "testTemplates": {
+        "timer": "jest.useFakeTimers();\ncomponent.startCountdown();\njest.advanceTimersByTime(5000);\nexpect(component.count).toBe(expected);"
+      },
+      "recommendedCoveragePct": 70
+    },
+    {
+      "id": "CONFIG_ENV",
+      "name": "Configuration & Environment Handling",
+      "triggerIndicators": ["process.env", "environment.ts", "window.__ENV__", "FEATURE_FLAG"],
+      "priority": 4,
+      "whatToCover": [
+        "Environment variables loaded correctly per env",
+        "Feature flags toggle behavior",
+        "Fallback defaults when env keys missing"
+      ],
+      "mocking": ["mock process.env or environment object"],
+      "testTemplates": {
+        "env": "mockEnv({API_URL: 'http://test'});\nexpect(config.apiUrl).toBe('http://test');"
+      },
+      "recommendedCoveragePct": 80
+    },
+    {
+      "id": "DOM_A11Y",
+      "name": "DOM & Accessibility (a11y)",
+      "triggerIndicators": ["aria-", "alt=", "role=", "tabIndex", "label", "aria-label"],
+      "priority": 6,
+      "whatToCover": [
+        "Elements have accessible labels and roles",
+        "Keyboard navigation works (tab / enter)",
+        "Images have alt text",
+        "No duplicate IDs or focus traps"
+      ],
+      "mocking": ["DOM helpers", "screen / queries (testing-library)"],
+      "testTemplates": {
+        "a11y": "expect(screen.getByRole('button', {name: /submit/i})).toBeInTheDocument();\nexpected(screen.getByLabelText('Email')).toBeTruthy();"
+      },
+      "recommendedCoveragePct": 60
+    },
+    {
+      "id": "ANALYTICS_TRACKING",
+      "name": "Analytics & Event Tracking",
+      "triggerIndicators": ["ga(", "gtag(", "trackEvent", "analytics", "dataLayer", "fbq(", "mixpanel"],
+      "priority": 4,
+      "whatToCover": [
+        "Event tracking calls with correct parameters",
+        "User journey funnels and conversion events",
+        "Page view tracking on route changes",
+        "Custom properties and dimensions",
+        "Privacy compliance (opt-out scenarios)",
+        "A/B test variant tracking"
+      ],
+      "mocking": ["spy on analytics methods", "mock analytics libraries", "mock dataLayer"],
+      "testTemplates": {
+        "trackEvent": "mockAnalytics.track = jest.fn();\ncomponent.onButtonClick();\nexpect(mockAnalytics.track).toHaveBeenCalledWith('button_clicked', {category: 'engagement'});",
+        "pageView": "mockGtag = jest.fn();\nnavigateToPage('/dashboard');\nexpect(mockGtag).toHaveBeenCalledWith('config', 'GA_ID', {page_path: '/dashboard'});"
+      },
+      "recommendedCoveragePct": 85
+    },
+    {
+      "id": "FORM_VALIDATION",
+      "name": "Form Validation & Input Handling",
+      "triggerIndicators": ["validator", "FormControl", "validation", "useFormik", "yup", "joi", "react-hook-form"],
+      "priority": 2,
+      "whatToCover": [
+        "Required field validation messages",
+        "Format validation (email, phone, regex patterns)",
+        "Custom validator functions",
+        "Cross-field validation dependencies",
+        "Dynamic validation rule changes",
+        "Submit prevention when form invalid",
+        "Real-time vs submit-time validation"
+      ],
+      "mocking": ["mock validation libraries", "spy on validation functions"],
+      "testTemplates": {
+        "required": "component.form.get('email').setValue('');\nexpect(component.form.get('email').errors?.['required']).toBeTruthy();",
+        "format": "component.form.get('email').setValue('invalid-email');\nexpected(component.form.get('email').errors?.['email']).toBeTruthy();",
+        "submit": "component.form.markAllAsTouched();\ncomponent.onSubmit();\nexpect(apiCall).not.toHaveBeenCalled();"
+      },
+      "recommendedCoveragePct": 95
+    },
+    {
+      "id": "ASYNC_STATE",
+      "name": "Async State Management & Race Conditions",
+      "triggerIndicators": ["Promise", "async", "await", "Observable", "useEffect", "subscription", "race condition"],
+      "priority": 3,
+      "whatToCover": [
+        "Loading states during async operations",
+        "Race condition handling (cancel previous requests)",
+        "Retry logic and exponential backoff",
+        "Concurrent request deduplication",
+        "Subscription cleanup on unmount/destroy",
+        "Promise rejection handling",
+        "Timeout scenarios"
+      ],
+      "mocking": ["control Promise resolution timing", "mock subscription cleanup", "use fake timers"],
+      "testTemplates": {
+        "loading": "const promise = component.loadData();\nexpect(component.loading).toBe(true);\nawait promise;\nexpect(component.loading).toBe(false);",
+        "raceCondition": "const req1 = component.search('query1');\nconst req2 = component.search('query2');\nawait req2;\nexpect(component.results).toEqual(query2Results);",
+        "cleanup": "component.ngOnInit();\ncomponent.ngOnDestroy();\nexpected(mockSubscription.unsubscribe).toHaveBeenCalled();"
+      },
+      "recommendedCoveragePct": 85
+    },
+    {
+      "id": "LOCALIZATION_I18N",
+      "name": "Internationalization & Localization",
+      "triggerIndicators": ["i18n", "translate", "locale", "$t(", "useTranslation", "formatMessage", "intl"],
+      "priority": 4,
+      "whatToCover": [
+        "Translation key resolution for different locales",
+        "Fallback to default language when key missing",
+        "Number and date formatting per locale",
+        "Currency formatting and conversion",
+        "RTL (right-to-left) layout handling",
+        "Pluralization rules",
+        "Dynamic locale switching"
+      ],
+      "mocking": ["mock translation service", "mock locale detection", "stub intl formatters"],
+      "testTemplates": {
+        "translation": "mockI18n.t.mockReturnValue('Hola Mundo');\ncomponent.setLocale('es');\nexpect(component.greeting).toBe('Hola Mundo');",
+        "fallback": "mockI18n.t.mockReturnValue('fallback.key');\nexpected(component.text).toBe('fallback.key');"
+      },
+      "recommendedCoveragePct": 75
+    },
+    {
+      "id": "FILE_UPLOAD",
+      "name": "File Upload & Media Handling",
+      "triggerIndicators": ["FileReader", "FormData", "upload", "file input", "drag", "drop", "blob", "multipart"],
+      "priority": 3,
+      "whatToCover": [
+        "File selection and validation (size, type, count)",
+        "Upload progress tracking",
+        "Drag and drop functionality",
+        "File preview generation (images, thumbnails)",
+        "Upload cancellation and retry",
+        "Multiple file handling",
+        "Error handling (network, server, validation)"
+      ],
+      "mocking": ["mock FileReader", "mock FormData", "mock upload API", "mock file objects"],
+      "testTemplates": {
+        "fileSelect": "const file = new File(['content'], 'test.jpg', {type: 'image/jpeg'});\ncomponent.onFileSelect({target: {files: [file]}});\nexpect(component.selectedFiles).toContain(file);",
+        "validation": "const largeFile = new File(['x'.repeat(10000000)], 'large.jpg');\ncomponent.validateFile(largeFile);\nexpected(component.error).toContain('File too large');"
+      },
+      "recommendedCoveragePct": 80
+    },
+    {
+      "id": "REAL_TIME",
+      "name": "Real-time Communication (WebSocket, SSE)",
+      "triggerIndicators": ["WebSocket", "socket.io", "EventSource", "SSE", "real-time", "live updates"],
+      "priority": 4,
+      "whatToCover": [
+        "WebSocket connection establishment and cleanup",
+        "Message sending and receiving",
+        "Connection loss and reconnection logic",
+        "Event-driven state updates",
+        "Message queuing during disconnection",
+        "Authentication over WebSocket",
+        "Error handling and fallback mechanisms"
+      ],
+      "mocking": ["mock WebSocket", "mock socket.io", "simulate connection events"],
+      "testTemplates": {
+        "connect": "mockSocket.connect.mockImplementation(() => {\n  mockSocket.onopen();\n});\ncomponent.connect();\nexpected(component.connected).toBe(true);",
+        "message": "mockSocket.onmessage({data: JSON.stringify({type: 'update', payload: data})});\nexpected(component.liveData).toEqual(data);"
+      },
+      "recommendedCoveragePct": 80
+    },
+    {
+      "id": "PWA_OFFLINE",
+      "name": "Progressive Web App & Offline Support",
+      "triggerIndicators": ["serviceWorker", "navigator.onLine", "offline", "cache", "workbox", "manifest"],
+      "priority": 5,
+      "whatToCover": [
+        "Service worker registration and updates",
+        "Offline detection and UI adaptation",
+        "Cache-first vs network-first strategies",
+        "Background sync and queued operations",
+        "Push notification handling",
+        "App install prompts and PWA features",
+        "Offline form submission queuing"
+      ],
+      "mocking": ["mock navigator.onLine", "mock service worker APIs", "mock cache storage"],
+      "testTemplates": {
+        "offline": "mockNavigator.onLine = false;\nwindow.dispatchEvent(new Event('offline'));\nexpected(component.isOffline).toBe(true);",
+        "swUpdate": "mockServiceWorker.postMessage({type: 'SKIP_WAITING'});\nexpected(component.showUpdatePrompt).toBe(true);"
+      },
+      "recommendedCoveragePct": 70
+    },
+    {
+      "id": "SECURITY_SANITIZATION",
+      "name": "Security & Input Sanitization",
+      "triggerIndicators": ["sanitize", "DOMSanitizer", "xss", "csrf", "innerHTML", "dangerouslySetInnerHTML"],
+      "priority": 2,
+      "whatToCover": [
+        "HTML/script injection prevention",
+        "URL sanitization and validation",
+        "CSRF token handling",
+        "Input escaping and encoding",
+        "Content Security Policy compliance",
+        "Safe dynamic content rendering",
+        "File upload security validation"
+      ],
+      "mocking": ["mock sanitizer services", "mock security policies"],
+      "testTemplates": {
+        "xssProtection": "const maliciousInput = '<script>alert(\"xss\")</script>';\nconst sanitized = sanitizer.sanitize(maliciousInput);\nexpected(sanitized).not.toContain('<script>');",
+        "csrfToken": "mockHttp.intercept.mockImplementation(req => {\n  expect(req.headers['X-CSRF-Token']).toBeTruthy();\n});"
+      },
+      "recommendedCoveragePct": 90
+    },
+    {
+      "id": "RESPONSIVE_BREAKPOINTS",
+      "name": "Responsive Design & Breakpoints",
+      "triggerIndicators": ["@media", "breakpoint", "viewport", "resize", "matchMedia", "mobile", "tablet"],
+      "priority": 5,
+      "whatToCover": [
+        "Component behavior at different screen sizes",
+        "Responsive navigation (hamburger menu, sidebar)",
+        "Touch vs mouse event handling",
+        "Viewport-dependent content visibility",
+        "Image srcset and lazy loading",
+        "Orientation change handling"
+      ],
+      "mocking": ["mock window.matchMedia", "mock viewport dimensions", "simulate resize events"],
+      "testTemplates": {
+        "breakpoint": "mockMatchMedia('(max-width: 768px)').matches = true;\nwindow.dispatchEvent(new Event('resize'));\nexpected(component.isMobile).toBe(true);",
+        "orientation": "screen.orientation.angle = 90;\nwindow.dispatchEvent(new Event('orientationchange'));\nexpected(component.isLandscape).toBe(true);"
+      },
+      "recommendedCoveragePct": 65
+    },
+    {
+      "id": "THIRD_PARTY_INTEGRATION",
+      "name": "Third-party Libraries & SDKs",
+      "triggerIndicators": ["SDK", "widget", "embed", "iframe", "external", "vendor", "plugin"],
+      "priority": 4,
+      "whatToCover": [
+        "SDK initialization and configuration",
+        "Event callbacks from third-party services",
+        "Error handling when external service fails",
+        "Fallback UI when third-party unavailable",
+        "Data mapping between app and external APIs",
+        "Widget loading and error states"
+      ],
+      "mocking": ["mock third-party SDKs", "mock external API responses", "mock widget loading"],
+      "testTemplates": {
+        "sdkInit": "mockSDK.init.mockImplementation((config, callback) => {\n  callback({success: true});\n});\ncomponent.initializeSDK();\nexpected(component.sdkReady).toBe(true);",
+        "fallback": "mockSDK.load.mockRejectedValue(new Error('Network error'));\ncomponent.loadWidget();\nexpected(component.showFallbackUI).toBe(true);"
+      },
+      "recommendedCoveragePct": 75
+    },
+    {
+      "id": "COVERAGE_COMPLETION",
+      "name": "Coverage Gap Analysis",
+      "triggerIndicators": ["after initial test run"],
+      "priority": 1,
+      "whatToCover": [
+        "All conditional branches (if/else, ternary, switch)",
+        "Error handling catch blocks", 
+        "Default parameter branches",
+        "Null/undefined guard clauses",
+        "Early return statements",
+        "Private method indirect testing via public APIs"
+      ],
+      "iterativeApproach": {
+        "step1": "Generate tests using existing patterns (expect 60-70%)",
+        "step2": "Run coverage report, identify uncovered lines",
+        "step3": "Add minimal tests for each uncovered branch",
+        "step4": "Target remaining edge cases and error paths"
+      },
+      "testTemplates": {
+        "branchCoverage": "// For each uncovered if/else, add minimal test\nif (condition) { /* covered */ } else { /* add test for this branch */ }",
+        "errorBranch": "try { riskyOperation(); } catch (error) { /* add test that triggers this catch */ }",
+        "guardClause": "if (!input) return null; // add test with null/undefined input",
+        "ternary": "result = condition ? valueA : valueB; // test both condition true and false"
+      },
+      "mocking": ["minimal mocks to trigger specific branches", "spy on private methods via public APIs"],
+      "recommendedCoveragePct": 95
+    }
+  ],
+
+  "mockFactories": {
+    "http": {
+      "description": "Generic http mock factory",
+      "factories": {
+        "fetchMock": "global.fetch = jest.fn().mockResolvedValue({ json: () => mockData, status: 200 });",
+        "axiosMock": "jest.mock('axios'); axios.get.mockResolvedValue({data: mockData, status:200});",
+        "angularHttpClientMock": "const mockHttp = { get: jest.fn().mockResolvedValue(mockData) };"
+      }
+    },
+    "storage": {
+      "localStorageMock": "const localStorageMock = { getItem: jest.fn(), setItem: jest.fn(), removeItem: jest.fn(), clear: jest.fn() };",
+      "indexedDBMock": "Provide a small in-memory adapter or use indexeddb-mock for tests"
+    },
+    "analytics": {
+      "gaMock": "window.ga = jest.fn(); window.gtag = jest.fn();",
+      "dataLayerMock": "window.dataLayer = { push: jest.fn() };",
+      "mixpanelMock": "window.mixpanel = { track: jest.fn(), identify: jest.fn() };"
+    },
+    "webSocket": {
+      "socketMock": "const mockSocket = { send: jest.fn(), close: jest.fn(), addEventListener: jest.fn() };",
+      "socketIOMock": "const mockIO = { emit: jest.fn(), on: jest.fn(), disconnect: jest.fn() };"
+    },
+    "fileAPI": {
+      "fileReaderMock": "const mockFileReader = { readAsDataURL: jest.fn(), onload: jest.fn(), result: 'data:image/jpeg;base64,mock' };",
+      "fileMock": "const mockFile = new File(['content'], 'test.jpg', { type: 'image/jpeg', size: 1024 });"
+    },
+    "mediaQuery": {
+      "matchMediaMock": "window.matchMedia = jest.fn().mockImplementation(query => ({ matches: false, addListener: jest.fn(), removeListener: jest.fn() }));"
+    },
+    "serviceWorker": {
+      "swMock": "navigator.serviceWorker = { register: jest.fn(), ready: Promise.resolve({ update: jest.fn() }) };"
+    },
+    "i18n": {
+      "translateMock": "const mockI18n = { t: jest.fn().mockReturnValue('translated.text'), changeLanguage: jest.fn() };"
+    },
+    "router": {
+      "mockRouter": "const mockRouter = { navigate: jest.fn(), push: jest.fn(), replace: jest.fn() };"
+    },
+    "store": {
+      "mockStore": "create a test store with initial state and stubbed dispatch/select"
+    },
+    "elementRef": {
+      "domMock": "{ nativeElement: { focus: jest.fn(), blur: jest.fn(), scrollIntoView: jest.fn(), value: '' } }"
+    }
+  },
+
+  "automation": {
+    "detectionRules": {
+      "apiCalls": {
+        "match": ["axios", "fetch(", "HttpClient", "ApiService", "postData", "getData"],
+        "applyPattern": "API_COMM"
+      },
+      "formValidation": {
+        "match": ["FormControl", "form.get", "useForm", "onSubmit", "react-hook-form", "formik", "yup", "joi", "validator"],
+        "applyPattern": "FORM_VALIDATION"
+      },
+      "timers": {
+        "match": ["setTimeout", "setInterval", "jest.advanceTimersByTime", "countdown"],
+        "applyPattern": "PERFORMANCE_EDGE"
+      },
+      "analytics": {
+        "match": ["ga(", "trackEvent", "clickStream", "analyticsService", "gtag(", "dataLayer", "mixpanel"],
+        "applyPattern": "ANALYTICS_TRACKING"
+      },
+      "async": {
+        "match": ["Promise", "async", "await", "Observable", "useEffect", "subscription"],
+        "applyPattern": "ASYNC_STATE"
+      },
+      "i18n": {
+        "match": ["i18n", "translate", "$t(", "useTranslation", "formatMessage", "intl"],
+        "applyPattern": "LOCALIZATION_I18N"
+      },
+      "fileUpload": {
+        "match": ["FileReader", "FormData", "upload", "file input", "drag", "drop"],
+        "applyPattern": "FILE_UPLOAD"
+      },
+      "realtime": {
+        "match": ["WebSocket", "socket.io", "EventSource", "SSE"],
+        "applyPattern": "REAL_TIME"
+      },
+      "pwa": {
+        "match": ["serviceWorker", "navigator.onLine", "offline", "workbox"],
+        "applyPattern": "PWA_OFFLINE"
+      },
+      "security": {
+        "match": ["sanitize", "DOMSanitizer", "xss", "csrf", "innerHTML"],
+        "applyPattern": "SECURITY_SANITIZATION"
+      },
+      "responsive": {
+        "match": ["@media", "breakpoint", "matchMedia", "resize", "viewport"],
+        "applyPattern": "RESPONSIVE_BREAKPOINTS"
+      },
+      "thirdParty": {
+        "match": ["SDK", "widget", "embed", "iframe", "external", "vendor"],
+        "applyPattern": "THIRD_PARTY_INTEGRATION"
+      },
+      "auth": {
+        "match": ["localStorage.getItem('token')", "AuthService", "jwt", "refreshToken"],
+        "applyPattern": "AUTH"
+      },
+      "coverageGaps": {
+        "match": ["coverage report", "uncovered lines", "branch coverage", "lcov"],
+        "applyPattern": "COVERAGE_COMPLETION"
+      }
+    },
+    "testGenerator": {
+      "input": ["filePath", "detectedPatterns", "projectFramework", "coverageTarget"],
+      "process": [
+        "analyze file AST for triggers",
+        "map detected constructs to patterns",
+        "generate test skeletons using pattern templates",
+        "create mocks using mockFactories",
+        "output test file(s) with framework adapter"
+      ],
+      "outputFormats": ["jest (.spec.ts/.spec.js)", "mocha", "playwright/cypress for e2e"]
+    }
+  },
+
+  "copilotPromptTemplates": {
+    "short": "Generate unit tests for {filePath}. Cover API success & error flows, UI render states (loading/empty/error), event handlers, utilities' edge cases, auth/storage behaviors, and environment config. Use mocks for HTTP and storage. Target coverage: {coverageTarget}% and prefer {framework}.",
+    "detailed": "You are a test-generator. For the file {filePath} in a {framework} project, generate unit tests using {testRunner}. Requirements:\n1) Cover API calls: success (200), client errors (4xx), server errors (5xx), network/timeouts, interceptors, and auth header injection (mock tokens).\n2) Cover component/UI: render, props/input binding, event handlers, conditional render branches, loading/empty/error states, accessibility assertions.\n3) Cover utilities: pure functions with edge cases (null/undefined/invalid), date/time functions (mock Date), encryption/decryption (mock keys).\n4) Cover auth: storage read/write, expired token flows, logout clearing sensitive data.\n5) Cover routing: parameter handling, guards, redirects.\n6) Use mocks for HTTP, localStorage, router, and store. Use fake timers for timer-based logic.\n7) Create one test per logical assertion, follow naming: 'should {action} when {condition}'.\n8) Provide mocks and fixtures inline. Aim for at least {coverageTarget}% coverage. Output only the test file content (no extra explanation).",
+    "coverageGap": "Analyze the coverage report for {filePath}. Identify uncovered branches and generate minimal tests to cover each gap. For each uncovered line, create a focused test that exercises that specific branch. Use existing mocks and follow the pattern: 'should cover {branch description} when {specific condition}'. Focus on conditional statements, error handlers, guard clauses, and default parameters that aren't being tested.",
+    "examples": [
+      {
+        "description": "API success/fail test (Jest pseudocode)",
+        "promptSnippet": "mockApi.get.mockResolvedValue({data: {...}, status:200}); await component.load(); expect(component.data).toEqual(expected); mockApi.get.mockRejectedValue({status:500}); await component.load(); expect(component.error).toBeTruthy();"
+      },
+      {
+        "description": "Branch coverage gap test",
+        "promptSnippet": "// Coverage shows line 45 uncovered: if (user.role === 'admin')\nit('should handle admin role branch', () => {\n  component.user = {role: 'admin'};\n  component.checkPermissions();\n  expect(component.hasAdminAccess).toBe(true);\n});"
+      }
+    ]
+  },
+
+  "examples": {
+    "apiTestSkeleton": {
+      "name": "should map API response to model on success and set error on server error",
+      "steps": [
+        "Arrange: create mock success response and mock error response",
+        "Act: call component.methodThatCallsApi()",
+        "Assert: on success mappedModel equals expectedModel; on error component.errorState === true"
+      ],
+      "pseudocode": "mockApi.call.mockResolvedValue(mockSuccess); await sut(); expect(sut.model).toEqual(expectedModel); mockApi.call.mockRejectedValue({status:500}); await sut(); expect(sut.error).toBe(true);"
+    },
+    "componentTestSkeleton": {
+      "name": "should render with correct props and handle click",
+      "steps": ["Render component with props", "Simulate click", "Assert event handler called and state changed"],
+      "pseudocode": "render(<C propA='x' />); fireEvent.click(getByText('Save')); expect(handleSave).toHaveBeenCalledWith(expectedArgs);"
+    },
+    "coverageGapTestSkeleton": {
+      "name": "should cover uncovered branch when specific condition met",
+      "steps": [
+        "Identify the uncovered branch from coverage report",
+        "Set up minimal state to trigger that branch",
+        "Execute the method containing the branch",
+        "Assert the branch-specific behavior occurred"
+      ],
+      "pseudocode": "// For uncovered: if (!data) return null;\nexpect(component.processData(null)).toBe(null);"
+    }
+  },
+
+  "qualityAndCI": {
+    "coverageEnforcement": {
+      "default": "90",
+      "advice": "Set per-repo thresholds in CI; allow exemptions for legacy files with documented rationale."
+    },
+    "ciSteps": [
+      "Run lint",
+      "Run unit tests with coverage",
+      "Fail build if coverage below threshold",
+      "Upload coverage report (lcov/json)",
+      "Run e2e tests on merged branches"
+    ],
+    "reporting": {
+      "format": ["text", "lcov", "json"],
+      "tools": ["codecov", "coveralls"]
+    }
+  },
+
+  "extensionPoints": {
+    "frameworkAdapters": {
+      "angular": {
+        "notes": "Map generic patterns to TestBed or Direct Instantiation. Prefer mocks for services; TestBed only when template interactions or DI edge cases needed."
+      },
+      "react": {
+        "notes": "Map to React Testing Library for DOM assertions; use jest mocks for hooks and axios/fetch."
+      },
+      "node": {
+        "notes": "Map API_COMM patterns to supertest or jest + nock, focusing on route handlers or service methods."
+      }
+    },
+    "customPatterns": {
+      "structure": {
+        "id": "<CUSTOM_ID>",
+        "name": "<Custom Name>",
+        "trigger": "<code pattern trigger>",
+        "priority": 1,
+        "template": "<test skeleton template>"
+      }
+    }
+  },
+  "howToUse": [
+    "1) Run static detector to map files to patterns using automation.detectionRules.",
+    "2) For each file, fill placeholders {filePath}, {framework}, {coverageTarget} in copilotPromptTemplates.detailed.",
+    "3) Ask Copilot/LLM to generate tests using the detailed prompt; apply frameworkAdapter transformations if needed.",
+    "4) Inject mockFactories into generated tests.",
+    "5) Run tests locally and enforce coverage via CI."
+  ]
+}
