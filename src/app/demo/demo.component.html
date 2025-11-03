@@ -1,0 +1,190 @@
+<section class="demo" [class.dark-theme]="theme === 'dark'">
+  <header class="demo-header">
+    <h2>{{ title }}</h2>
+    <p>{{ description }}</p>
+    <div class="theme-controls">
+      <button (click)="toggleTheme()">
+        Switch to {{ theme === 'light' ? 'Dark' : 'Light' }} Theme
+      </button>
+      <span class="current-time">{{ currentTime | date:'medium' }}</span>
+      <span class="counter">Counter: {{ counter }}</span>
+    </div>
+  </header>
+
+  <div class="error-message" *ngIf="errorMessage">
+    {{ errorMessage }}
+  </div>
+
+  <!-- Statistics Dashboard -->
+  <section class="statistics">
+    <h3>Statistics</h3>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <h4>Users</h4>
+        <p>Total: {{ statistics.totalUsers }}</p>
+        <p>Active: {{ statistics.activeUsers }}</p>
+      </div>
+      <div class="stat-card">
+        <h4>Todos</h4>
+        <p>Total: {{ statistics.totalTodos }}</p>
+        <p>Completed: {{ statistics.completedTodos }}</p>
+        <p>High Priority: {{ statistics.highPriorityTodos }}</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- User Management Section -->
+  <section class="user-management">
+    <h3>User Management</h3>
+    
+    <div class="user-controls">
+      <button (click)="showUserForm = !showUserForm">
+        {{ showUserForm ? 'Hide' : 'Add New User' }}
+      </button>
+      <button (click)="sortUsersByName()">Sort by Name</button>
+      <button (click)="sortUsersByEmail()">Sort by Email</button>
+      <button (click)="activateAllUsers()">Activate All</button>
+      <button (click)="deactivateAllUsers()">Deactivate All</button>
+    </div>
+
+    <div class="user-form" *ngIf="showUserForm">
+      <input #userName placeholder="Enter user name" />
+      <input #userEmail type="email" placeholder="Enter user email" />
+      <button (click)="addUser(userName.value, userEmail.value); userName.value=''; userEmail.value=''">
+        Add User
+      </button>
+    </div>
+
+    <div class="user-search">
+      <input [(ngModel)]="userSearchTerm" placeholder="Search users..." />
+    </div>
+
+    <div class="user-list">
+      <div 
+        *ngFor="let user of searchUsers()" 
+        class="user-item"
+        [class.selected]="selectedUser?.id === user.id"
+        [class.inactive]="!user.isActive"
+        (click)="selectUser(user)"
+      >
+        <div class="user-info">
+          <h4>{{ user.name }}</h4>
+          <p>{{ user.email }}</p>
+          <span class="status" [class.active]="user.isActive">
+            {{ user.isActive ? 'Active' : 'Inactive' }}
+          </span>
+        </div>
+        <div class="user-actions">
+          <button (click)="toggleUserStatus(user.id); $event.stopPropagation()">
+            {{ user.isActive ? 'Deactivate' : 'Activate' }}
+          </button>
+          <button (click)="deleteUser(user.id); $event.stopPropagation()" class="delete-btn">
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Todo Management Section -->
+  <section class="todo-management">
+    <h3>Todo Management</h3>
+    
+    <div class="todo-controls">
+      <div class="add-todo">
+        <input [(ngModel)]="newTodoTitle" placeholder="Enter todo title" />
+        <select [(ngModel)]="selectedPriority">
+          <option value="low">Low Priority</option>
+          <option value="medium">Medium Priority</option>
+          <option value="high">High Priority</option>
+        </select>
+        <button (click)="addTodo()">Add Todo</button>
+      </div>
+      
+      <div class="todo-filters">
+        <label>
+          <input type="radio" [(ngModel)]="todoFilter" value="all" />
+          All ({{ todos.length }})
+        </label>
+        <label>
+          <input type="radio" [(ngModel)]="todoFilter" value="active" />
+          Active ({{ getActiveTodosCount() }})
+        </label>
+        <label>
+          <input type="radio" [(ngModel)]="todoFilter" value="completed" />
+          Completed ({{ getCompletedTodosCount() }})
+        </label>
+      </div>
+
+      <div class="bulk-actions">
+        <button (click)="markAllTodosComplete()">Mark All Complete</button>
+        <button (click)="markAllTodosIncomplete()">Mark All Incomplete</button>
+        <button (click)="clearCompletedTodos()">Clear Completed</button>
+        <button (click)="sortTodosByPriority()">Sort by Priority</button>
+        <button (click)="sortTodosByDate()">Sort by Date</button>
+      </div>
+    </div>
+
+    <div class="todo-list">
+      <div 
+        *ngFor="let todo of getFilteredTodos()" 
+        class="todo-item"
+        [class.completed]="todo.completed"
+        [class.high-priority]="todo.priority === 'high'"
+        [class.medium-priority]="todo.priority === 'medium'"
+        [class.low-priority]="todo.priority === 'low'"
+      >
+        <input 
+          type="checkbox" 
+          [checked]="todo.completed" 
+          (change)="toggleTodo(todo.id)"
+        />
+        <div class="todo-content">
+          <h4>{{ todo.title }}</h4>
+          <div class="todo-meta">
+            <span class="priority">Priority: {{ todo.priority }}</span>
+            <span class="created-date">Created: {{ todo.createdAt | date:'short' }}</span>
+          </div>
+        </div>
+        <div class="todo-actions">
+          <select (change)="updateTodoPriority(todo.id, $any($event.target).value)">
+            <option [value]="todo.priority" selected>{{ todo.priority | titlecase }}</option>
+            <option *ngIf="todo.priority !== 'low'" value="low">Low</option>
+            <option *ngIf="todo.priority !== 'medium'" value="medium">Medium</option>
+            <option *ngIf="todo.priority !== 'high'" value="high">High</option>
+          </select>
+          <button (click)="deleteTodo(todo.id)" class="delete-btn">Delete</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Data Management Section -->
+  <section class="data-management">
+    <h3>Data Management</h3>
+    <div class="data-controls">
+      <button (click)="resetToDefaults()">Reset to Defaults</button>
+      <button (click)="resetAllData()" class="danger-btn">Clear All Data</button>
+    </div>
+    
+    <div class="import-export">
+      <h4>Export/Import Data</h4>
+      <button (click)="exportToConsole()">Export Data</button>
+      <div class="import-section">
+        <textarea #importDataRef placeholder="Paste JSON data here..."></textarea>
+        <button (click)="importData(importDataRef.value); importDataRef.value=''">Import Data</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Selected User Details -->
+  <section class="user-details" *ngIf="selectedUser">
+    <h3>Selected User Details</h3>
+    <div class="user-detail-card">
+      <h4>{{ selectedUser.name }}</h4>
+      <p><strong>Email:</strong> {{ selectedUser.email }}</p>
+      <p><strong>Status:</strong> {{ selectedUser.isActive ? 'Active' : 'Inactive' }}</p>
+      <p><strong>ID:</strong> {{ selectedUser.id }}</p>
+    </div>
+  </section>
+</section>
